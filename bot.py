@@ -1,5 +1,6 @@
 import tweepy # for tweeting
 import secrets # shhhh
+import requests
 import nltk # for sentence parsing
 nltk.download('punkt')
 
@@ -24,6 +25,35 @@ def get_next_chunk():
   text_file.close()
   return chunk
 
+def get_article():
+  response = requests.get('http://api.nytimes.com/svc/news/v3/content/nyt/all'
+      '/last24hours?api-key=%s&limit=1' % secrets.nyt_api_key)
+  data = response.json()
+  articles = data['results']
+  article = articles[0]
+  return article
+
+def improve_headline(headline):
+  tokens = nltk.word_tokenize(headline)
+  tagged = nltk.pos_tag(tokens)
+  # Just replace the last noun in the headline, matching plurality
+  for word, pos in reversed(tagged):
+    if pos == 'NN' or pos == 'NNP' or pos == 'NNS':
+      replacement = 'Puppy'
+      break
+    elif pos == 'NNPS':
+      replacement = 'Puppies'
+      break
+
+  better_headline = headline.replace(word, replacement)
+  return better_headline
+
+def make_news_tweet():
+  article = get_article()
+  headline = improve_headline(article['title'])
+  tweet = 'BREAKING: {}\n{}'.format(headline, article['url'])
+  return tweet
+
 def tweet(message):
   auth = tweepy.OAuthHandler(secrets.consumer_key, secrets.consumer_secret)
   auth.set_access_token(secrets.access_token, secrets.access_token_secret)
@@ -32,4 +62,4 @@ def tweet(message):
   print("Posting message {}".format(message))
   api.update_status(status=message)
 
-tweet(get_next_chunk())
+tweet(make_news_tweet())
